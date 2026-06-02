@@ -7,6 +7,9 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  doc,
+  getDoc,
+  setDoc,
 } from "firebase/firestore";
 
 import { auth, db } from "./firebase";
@@ -19,10 +22,31 @@ export default function App() {
   const [page, setPage] = useState("chat");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState(null);
 
   // 🔐 AUTH LISTENER
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        // Check if user document exists
+        const userDocRef = doc(db, "users", u.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (!userDocSnap.exists()) {
+          // Create user document if it doesn't exist (for existing users)
+          await setDoc(userDocRef, {
+            displayName: u.displayName || u.email.split("@")[0],
+            email: u.email,
+            photoURL: "",
+            createdAt: new Date(),
+          });
+        }
+
+        // Fetch user profile
+        const profileSnap = await getDoc(userDocRef);
+        setUserProfile(profileSnap.data());
+      }
+
       setUser(u);
       setLoading(false);
     });
@@ -52,22 +76,24 @@ export default function App() {
 
   // ✉️ SEND MESSAGE
   async function sendMessage(text) {
-    if (!user) return;
+    if (!user || !userProfile) return;
 
     await addDoc(collection(db, "messages"), {
       text,
       uid: user.uid,
       email: user.email,
+      senderName: userProfile.displayName || user.email,
+      senderPhotoURL: userProfile.photoURL || "",
       createdAt: serverTimestamp(),
     });
   }
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <p style={{ textAlign: "center", marginTop: "50vh" }}>Loading...</p>;
 
   if (!user) return <Auth />;
 
   if (page === "profile") {
-    return <Profile onBack={() => setPage("chat")} />;
+    return <Profile onBack={() => setPage("chat")} onProfileUpdate={setUserProfile} />;
   }
 
   return (

@@ -5,7 +5,12 @@ export default function Message({ message }) {
 
   return (
     <div className={`message ${isMe ? "me" : "other"}`}>
-      <p>{message.text}</p>
+      <div className="message-header">
+        <span className="sender-name">
+          {isMe ? "You" : message.senderName || "Unknown"}
+        </span>
+      </div>
+      <p className="message-text">{message.text}</p>
     </div>
   );
 }
